@@ -69,7 +69,7 @@ export default function Home() {
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
-    document.documentElement.classList.toggle('dark');
+    document.documentElement.classList.toggle('dark', !darkMode);
   };
 
   const createSlicePath = (index: number, totalSegments: number) => {
@@ -124,12 +124,10 @@ export default function Home() {
   };
 
   // Color and textColor logic for dynamic segments
-  const wheelColors = [
-    { color: '#4285F4', textColor: '#fff' }, // Blue
-    { color: '#EA4335', textColor: '#fff' }, // Red
-    { color: '#FBBC05', textColor: '#111' }, // Yellow
-    { color: '#34A853', textColor: '#111' }  // Green
-  ];
+const wheelColors = [
+  { color: '#000000', textColor: '#FFFFFF' }, // Black with white text
+  { color: '#FFFFFF', textColor: '#000000' }  // White with black text
+];
 
   // Helper to get color for a segment index, avoiding consecutive duplicates
   function getWheelColor(idx: number, segments: string[]): { color: string; textColor: string; colorIdx: number } {
@@ -403,7 +401,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#181818] flex flex-col">
+    <div className={`min-h-screen w-full flex flex-col ${darkMode ? 'dark' : ''}`} style={{ backgroundColor: darkMode ? '#181818' : '#ffffff' }}>
       {/* Blue Navbar */}
       <nav className="w-full bg-[#4285F4] flex items-center px-4 py-2 gap-4 shadow-md">
         {/* Logo */}
@@ -426,16 +424,31 @@ export default function Home() {
           <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="gallery">🖼️</span>Gallery</button>
           <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="more">⋯</span>More</button>
           <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="language">🌐</span>English</button>
+          {/* Dark Mode Toggle Button */}
+          <button 
+            className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"
+            onClick={toggleDarkMode}
+            title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            <span role="img" aria-label="dark mode">{darkMode ? "☀️" : "🌙"}</span>
+            {darkMode ? "Light" : "Dark"}
+          </button>
         </div>
       </nav>
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center w-full max-w-full relative overflow-hidden">
         {/* Wheel Section */}
-        <section className="flex flex-col items-center justify-center py-8" style={{width: '100%', height: '100%', maxWidth: '100vw', maxHeight: '100vh'}}>
+        <section className="flex flex-col items-center justify-center py-8" style={{ width: '100%', height: '100%', maxWidth: '100vw', maxHeight: '100vh' }}>
           {/* SVG Wheel */}
           <div
             className="relative flex items-center justify-center mx-auto"
-            style={{ width: 'min(580px, 90vw)', height: 'min(580px, 90vw)', maxWidth: '90vw', maxHeight: '90vh', cursor: isSpinning || segments.length < 2 ? 'not-allowed' : 'pointer' }}
+            style={{
+              width: `min(580px, 90vw)`,
+              height: `min(580px, 90vw)`,
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              cursor: isSpinning || segments.length < 2 ? 'not-allowed' : 'pointer',
+            }}
             onClick={handleSpin}
             title={segments.length < 2 ? 'Add at least 2 options to spin' : 'Click to spin the wheel'}
           >
@@ -449,15 +462,15 @@ export default function Home() {
             >
               <defs>
                 <radialGradient id="wheelGradient" cx="50%" cy="50%" r="60%">
-                  <stop offset="0%" stopColor="#fff" stopOpacity="0.15" />
-                  <stop offset="100%" stopColor="#000" stopOpacity="0.10" />
+                  <stop offset="0%" stopColor={darkMode ? '#fff' : '#000'} stopOpacity="0.15" />
+                  <stop offset="100%" stopColor={darkMode ? '#000' : '#fff'} stopOpacity="0.10" />
                 </radialGradient>
                 {segments.map((name, i) => {
                   const segAngle = 360 / segments.length;
                   const startAngle = i * segAngle;
                   const endAngle = (i + 1) * segAngle;
                   return (
-                      <path
+                    <path
                       key={i}
                       id={`arc-text-${i}`}
                       d={describeArc(290, 290, 235, startAngle + 2, endAngle - 2)}
@@ -486,7 +499,7 @@ export default function Home() {
                 );
               })}
               {/* Center white circle */}
-              <circle cx="290" cy="290" r="55" fill="#fff" />
+              <circle cx="290" cy="290" r="55" fill={darkMode ? '#fff' : '#000'} />
               {/* Curved Text */}
               {segments.map((name, i) => {
                 const { textColor } = getWheelColor(i, segments);
@@ -497,7 +510,7 @@ export default function Home() {
                     fontWeight="500"
                     fontSize="40"
                     fill={textColor}
-              style={{
+                    style={{
                       textShadow: 'none',
                       filter: 'none',
                       letterSpacing: '2px'
@@ -516,50 +529,61 @@ export default function Home() {
               })}
             </svg>
             {/* Pointer on right center */}
-            <div className="absolute" style={{ top: '50%', right: '-18px', transform: 'translateY(-50%)', zIndex: 20 }}>
+            <div
+              className="absolute"
+              style={{
+                top: '50%',
+                right: '-18px',
+                transform: 'translateY(-50%)',
+                zIndex: 20,
+              }}
+            >
               <div className="w-0 h-0 border-t-[18px] border-t-transparent border-b-[18px] border-b-transparent border-r-[36px] border-r-white"></div>
             </div>
           </div>
         </section>
 
         {/* Sidebar Section */}
-        <aside className="w-[340px] min-h-[540px] bg-[#181818] border border-[#23272b] rounded-2xl shadow-lg flex flex-col px-4 pt-4 pb-2 absolute right-8 top-1/2" style={{transform: 'translateY(-50%)'}}>
+        <aside
+          className="w-[340px] min-h-[540px] border rounded-2xl shadow-lg flex flex-col px-4 pt-4 pb-2 absolute right-8 top-1/2"
+          style={{ transform: 'translateY(-50%)' }}
+        >
           {sidebarHidden ? (
             <div className="flex justify-end items-center h-10">
-              <label className="flex items-center gap-1 text-xs text-gray-400 font-bold pb-1 px-2 cursor-pointer select-none" style={{height: '32px'}}>
-            <input
+              <label className="flex items-center gap-1 text-xs font-bold pb-1 px-2 cursor-pointer select-none" style={{ height: '32px' }}>
+                <input
                   type="checkbox"
                   className="align-middle"
                   checked={sidebarHidden}
-                  onChange={e => setSidebarHidden(e.target.checked)}
-                  style={{ accentColor: '#23272b' }}
+                  onChange={(e) => setSidebarHidden(e.target.checked)}
+                  style={{ accentColor: darkMode ? '#23272b' : '#d1d5db' }}
                 />
                 Hide
-            </label>
+              </label>
             </div>
           ) : (
             <>
               {/* Tabs */}
               <div className="flex items-center mb-3 gap-2">
                 <button
-                  className={`text-white font-bold text-base pb-1 px-1 focus:outline-none border-b-2 ${activeTab === 'entries' ? 'border-blue-500' : 'border-transparent'}`}
+                  className={`font-bold text-base pb-1 px-1 focus:outline-none border-b-2 ${activeTab === 'entries' ? 'border-blue-500' : 'border-transparent'} ${darkMode ? 'text-white' : 'text-black'}`}
                   onClick={() => setActiveTab('entries')}
                 >
-                  Entries <span className="ml-1 bg-[#23272b] rounded px-2 text-xs font-normal">{segments.length}</span>
+                  Entries <span className="rounded px-2 text-xs font-normal">{segments.length}</span>
                 </button>
                 <button
-                  className={`text-gray-400 font-bold text-base pb-1 px-1 ml-4 focus:outline-none border-b-2 ${activeTab === 'results' ? 'border-blue-500 text-white' : 'border-transparent'}`}
+                  className={`font-bold text-base pb-1 px-1 ml-4 focus:outline-none border-b-2 ${activeTab === 'results' ? 'border-blue-500' : 'border-transparent'} ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}
                   onClick={() => setActiveTab('results')}
                 >
-                  Results <span className="ml-1 bg-[#23272b] rounded px-2 text-xs font-normal">{results.length}</span>
+                  Results <span className="rounded px-2 text-xs font-normal">{results.length}</span>
                 </button>
-                <label className="flex items-center gap-1 text-xs text-gray-400 font-bold pb-1 px-2 cursor-pointer select-none ml-4" style={{height: '32px'}}>
+                <label className="flex items-center gap-1 text-xs font-bold pb-1 px-2 cursor-pointer select-none ml-4" style={{ height: '32px' }}>
                   <input
                     type="checkbox"
                     className="align-middle"
                     checked={sidebarHidden}
-                    onChange={e => setSidebarHidden(e.target.checked)}
-                    style={{ accentColor: '#23272b' }}
+                    onChange={(e) => setSidebarHidden(e.target.checked)}
+                    style={{ accentColor: darkMode ? '#23272b' : '#d1d5db' }}
                   />
                   Hide
                 </label>
@@ -569,57 +593,57 @@ export default function Home() {
                 <>
                   {/* Controls */}
                   <div className="flex gap-2 mb-2">
-                    <button className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 12h16M4 6h16M4 18h16"/></svg>
+                    <button className={`flex items-center gap-1 text-white px-3 py-1.5 rounded text-xs font-semibold transition ${darkMode ? 'bg-[#23272b] hover:bg-[#222]' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke={darkMode ? '#fff' : '#000'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 12h16M4 6h16M4 18h16"/></svg>
                       Shuffle
                     </button>
-                    <button className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18"/></svg>
+                    <button className={`flex items-center gap-1 text-white px-3 py-1.5 rounded text-xs font-semibold transition ${darkMode ? 'bg-[#23272b] hover:bg-[#222]' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke={darkMode ? '#fff' : '#000'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18"/></svg>
                       Sort
                     </button>
-                    <button className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5"/></svg>
+                    <button className={`flex items-center gap-1 text-white px-3 py-1.5 rounded text-xs font-semibold transition ${darkMode ? 'bg-[#23272b] hover:bg-[#222]' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke={darkMode ? '#fff' : '#000'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5"/></svg>
                       Add image
                     </button>
                   </div>
                   <div className="mb-2">
-                    <label className="text-xs text-gray-400 select-none cursor-pointer"><input type="checkbox" className="mr-1 align-middle"/>Advanced</label>
+                    <label className={`text-xs select-none cursor-pointer ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}><input type="checkbox" className="mr-1 align-middle"/>Advanced</label>
                   </div>
                   {/* Entry List as textarea */}
-                  <div className="flex-1 bg-black rounded-lg p-2 text-white text-sm mb-2" style={{minHeight: '220px'}}>
+                  <div className={`flex-1 rounded-lg p-2 text-sm mb-2 ${darkMode ? 'bg-black text-white' : 'bg-white text-black'}`} style={{ minHeight: '220px' }}>
                     <textarea
                       value={entriesText}
-                      onChange={e => setEntriesText(e.target.value)}
-                      className="w-full h-full bg-black text-white text-sm resize-none outline-none border-none p-0 m-0"
-                      style={{minHeight: '200px', maxHeight: '340px'}}
+                      onChange={(e) => setEntriesText(e.target.value)}
+                      className={`w-full h-full ${darkMode ? 'bg-black text-white' : 'bg-white text-black'} text-sm resize-none outline-none border-none p-0 m-0`}
+                      style={{ minHeight: '200px', maxHeight: '340px' }}
                       spellCheck={false}
                     />
                   </div>
                   {/* Version and Changelog */}
-                  <div className="flex items-center justify-between text-xs text-gray-400 mt-2">
-                    <span>Version 360 <span className="bg-blue-700 text-white rounded px-1 ml-1">New!</span></span>
-                    <a href="#" className="text-blue-400 hover:underline">Changelog</a>
+                  <div className="flex items-center justify-between text-xs mt-2">
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Version 360 <span className="bg-blue-700 text-white rounded px-1 ml-1">New!</span></span>
+                    <a href="#" className={darkMode ? 'text-blue-400 hover:underline' : 'text-blue-600 hover:underline'}>Changelog</a>
                   </div>
                 </>
               ) : (
                 <>
                   {/* Results Controls */}
                   <div className="flex gap-2 mb-2">
-                    <button onClick={sortResults} className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18"/></svg>
+                    <button onClick={sortResults} className={`flex items-center gap-1 text-white px-3 py-1.5 rounded text-xs font-semibold transition ${darkMode ? 'bg-[#23272b] hover:bg-[#222]' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke={darkMode ? '#fff' : '#000'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18"/></svg>
                       Sort
                     </button>
-                    <button onClick={clearResults} className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
+                    <button onClick={clearResults} className={`flex items-center gap-1 text-white px-3 py-1.5 rounded text-xs font-semibold transition ${darkMode ? 'bg-[#23272b] hover:bg-[#222]' : 'bg-gray-200 hover:bg-gray-300'}`}>
                       Clear the list
                     </button>
                   </div>
                   {/* Results textarea-like box */}
-                  <div className="flex-1 bg-black rounded-lg p-2 text-white text-sm mb-2" style={{minHeight: '220px'}}>
+                  <div className={`flex-1 rounded-lg p-2 text-sm mb-2 ${darkMode ? 'bg-black text-white' : 'bg-white text-black'}`} style={{ minHeight: '220px' }}>
                     <textarea
                       value={results.join('\n')}
                       readOnly
-                      className="w-full h-full bg-black text-white text-sm resize-none outline-none border-none p-0 m-0"
-                      style={{minHeight: '200px', maxHeight: '340px'}}
+                      className={`w-full h-full ${darkMode ? 'bg-black text-white' : 'bg-white text-black'} text-sm resize-none outline-none border-none p-0 m-0`}
+                      style={{ minHeight: '200px', maxHeight: '340px' }}
                       spellCheck={false}
                     />
                   </div>
@@ -630,54 +654,55 @@ export default function Home() {
         </aside>
       </main>
       {/* Spin message overlay above the wheel */}
-      {showSpinMessage && (
-        <div
-          className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex flex-col items-center w-full"
-          style={{ transform: 'translate(-50%, -50%)', userSelect: 'none' }}
-        >
-          <div
-            style={{
-              fontFamily: 'Quicksand, Arial, sans-serif',
-              fontWeight: 700,
-              fontSize: '2.5rem',
-              color: '#fff',
-              textShadow: '2px 2px 8px #000',
-              filter: 'drop-shadow(0 2px 2px #0008)',
-              marginBottom: '0.5rem',
-              letterSpacing: '1px',
-            }}
-          >
-            Click to spin
-          </div>
-          <div
-            style={{
-              fontFamily: 'Quicksand, Arial, sans-serif',
-              fontWeight: 700,
-              fontSize: '1.5rem',
-              color: '#fff',
-              textShadow: '2px 2px 8px #000',
-              filter: 'drop-shadow(0 2px 2px #0008)',
-              letterSpacing: '1px',
-            }}
-          >
-            or press ctrl+enter
-          </div>
-        </div>
-      )}
+     {showSpinMessage && (
+  <div
+    className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex flex-col items-center w-full"
+    style={{
+      transform: 'translate(-50%, -50%)',
+      userSelect: 'none',
+    }}
+  >
+    <div
+      style={{
+        fontFamily: 'Quicksand, Arial, sans-serif',
+        fontWeight: 700,
+        fontSize: '2.5rem',
+        color: darkMode ? '#fff' : '#fff', // Changed from '#000' to '#fff' for light mode
+        textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5)',
+        marginBottom: '0.5rem',
+        letterSpacing: '1px',
+      }}
+    >
+      Click to spin
+    </div>
+    <div
+      style={{
+        fontFamily: 'Quicksand, Arial, sans-serif',
+        fontWeight: 700,
+        fontSize: '1.5rem',
+        color: darkMode ? '#fff' : '#fff', // Changed from '#000' to '#fff' for light mode
+        textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5)',
+        letterSpacing: '1px',
+      }}
+    >
+      or press ctrl+enter
+    </div>
+  </div>
+)}
       {/* Winner Modal */}
       {showWinnerModal && winner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'rgba(0,0,0,0.15)'}}>
-          <div className="bg-[#222] rounded-xl shadow-2xl max-w-lg w-full mx-4 relative border border-gray-700">
-            <div className="bg-red-600 text-white text-lg font-bold rounded-t-xl px-6 py-3 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.15)' }}>
+          <div className={`bg-${darkMode ? '#222' : '#f9f9f9'} rounded-xl shadow-2xl max-w-lg w-full mx-4 relative border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+            <div className={`bg-${darkMode ? 'red-500' : 'red-400'} text-white text-lg font-bold rounded-t-xl px-6 py-3 flex items-center justify-between`}>
               <span>We have a winner!</span>
-              <button className="text-2xl font-bold hover:text-gray-200" onClick={closeWinnerModal} style={{lineHeight:1}}>&times;</button>
+              <button className="text-2xl font-bold hover:text-gray-200" onClick={closeWinnerModal} style={{ lineHeight: 1 }}>×</button>
             </div>
-            <div className="flex flex-col items-center justify-center px-6 py-8">
-              <div className="text-5xl font-light mb-6" style={{fontFamily:'Quicksand, Arial, sans-serif'}}>{winner}</div>
+            <div className="flex flex-col items-center justify-center px-8 py-6">
+              <div className="text-5xl font-light mb-6 text-center" style={{ fontFamily: 'Quicksand, Arial, sans-serif', fontWeight: 500, color: darkMode ? '#fff' : '#000' }}>{winner}</div>
               <div className="flex gap-3 mt-2">
-                <button className="px-4 py-2 rounded bg-gray-700 text-white font-semibold hover:bg-gray-600" onClick={closeWinnerModal}>Close</button>
-                <button className="px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-500" onClick={removeWinner}>Remove</button>
-                <button className="px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-500" onClick={removeAllWinner}>Remove all instances</button>
+                <button className={`px-4 py-2 rounded ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-300 text-black hover:bg-gray-400'}`} onClick={closeWinnerModal}>Close</button>
+                <button className={`px-4 py-2 rounded ${darkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-blue-400 text-black hover:bg-blue-300'}`} onClick={removeWinner}>Remove</button>
+                <button className={`px-4 py-2 rounded ${darkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-blue-400 text-black hover:bg-blue-300'}`} onClick={removeAllWinner}>Remove all instances</button>
               </div>
             </div>
           </div>
@@ -691,7 +716,7 @@ export default function Home() {
 function ConfettiEffect() {
   // Simple confetti using absolutely positioned divs
   const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#FBBC05', '#EA4335', '#4285F4', '#34A853'];
-  const confettiPieces = Array.from({length: 80});
+  const confettiPieces = Array.from({ length: 80 }, (_, i) => i);
   return (
     <div className="pointer-events-none fixed inset-0 z-40">
       {confettiPieces.map((_, i) => {
@@ -709,9 +734,9 @@ function ConfettiEffect() {
               position: 'absolute',
               left: `${left}%`,
               top: `${top}%`,
-              width: size,
-              height: size * 0.4,
-              background: color,
+              width: `${size}px`,
+              height: `${size * 0.4}px`,
+              backgroundColor: color,
               borderRadius: '2px',
               opacity: 0.85,
               transform: `rotate(${rotate}deg)`,
