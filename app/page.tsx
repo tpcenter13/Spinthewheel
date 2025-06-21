@@ -9,7 +9,7 @@ export default function Home() {
   const [segments, setSegments] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [spinSpeed, setSpinSpeed] = useState(4); // Speed in seconds (1-10)
-  const [wheelSize, setWheelSize] = useState(384);
+  const [wheelSize, setWheelSize] = useState(500);
   const [winner, setWinner] = useState<string | null>(null);
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [showSpinMessage, setShowSpinMessage] = useState(true);
@@ -31,25 +31,25 @@ export default function Home() {
   // Results list
   const [results, setResults] = useState<string[]>([]);
 
-  // Handle responsive wheel sizing
-  useEffect(() => {
-    const updateWheelSize = () => {
-      const screenWidth = window.innerWidth;
-      if (screenWidth < 640) { // sm breakpoint
-        setWheelSize(280);
-      } else if (screenWidth < 768) { // md breakpoint
-        setWheelSize(320);
-      } else if (screenWidth < 1024) { // lg breakpoint
-        setWheelSize(360);
-      } else {
-        setWheelSize(384);
-      }
-    };
+// Handle responsive wheel sizing
+useEffect(() => {
+  const updateWheelSize = () => {
+    const screenWidth = window.innerWidth;
+    if (screenWidth < 640) { // sm breakpoint
+      setWheelSize(300); // Adjusted for smaller screens
+    } else if (screenWidth < 768) { // md breakpoint
+      setWheelSize(400); // Adjusted for medium screens
+    } else if (screenWidth < 1024) { // lg breakpoint
+      setWheelSize(450); // Adjusted for large screens
+    } else {
+      setWheelSize(500); // Default large size
+    }
+  };
 
-    updateWheelSize();
-    window.addEventListener('resize', updateWheelSize);
-    return () => window.removeEventListener('resize', updateWheelSize);
-  }, []);
+  updateWheelSize();
+  window.addEventListener('resize', updateWheelSize);
+  return () => window.removeEventListener('resize', updateWheelSize);
+}, []);
 
   // Keep segments in sync with textarea
   useEffect(() => {
@@ -113,9 +113,9 @@ export default function Home() {
     return 'Very Slow';
   };
 
-  const getWheelFontSize = () => {
-    return Math.max(8, wheelSize * 0.031);
-  };
+const getWheelFontSize = () => {
+  return Math.max(12, wheelSize * 0.05); // Increased base size to 12 and scaling factor to 0.05
+};
 
   const getTextLimit = () => {
     if (wheelSize < 300) return 6;
@@ -438,110 +438,111 @@ const wheelColors = [
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center w-full max-w-full relative overflow-hidden">
         {/* Wheel Section */}
-        <section className="flex flex-col items-center justify-center py-8" style={{ width: '100%', height: '100%', maxWidth: '100vw', maxHeight: '100vh' }}>
-          {/* SVG Wheel */}
-          <div
-            className="relative flex items-center justify-center mx-auto"
-            style={{
-              width: `min(580px, 90vw)`,
-              height: `min(580px, 90vw)`,
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              cursor: isSpinning || segments.length < 2 ? 'not-allowed' : 'pointer',
-            }}
-            onClick={handleSpin}
-            title={segments.length < 2 ? 'Add at least 2 options to spin' : 'Click to spin the wheel'}
-          >
-            {/* Confetti */}
-            {confetti && <ConfettiEffect />}
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 580 580"
-              style={{ transform: `rotate(${currentAngle}deg)` }}
-            >
-              <defs>
-                <radialGradient id="wheelGradient" cx="50%" cy="50%" r="60%">
-                  <stop offset="0%" stopColor={darkMode ? '#fff' : '#000'} stopOpacity="0.15" />
-                  <stop offset="100%" stopColor={darkMode ? '#000' : '#fff'} stopOpacity="0.10" />
-                </radialGradient>
-                {segments.map((name, i) => {
-                  const segAngle = 360 / segments.length;
-                  const startAngle = i * segAngle;
-                  const endAngle = (i + 1) * segAngle;
-                  return (
-                    <path
-                      key={i}
-                      id={`arc-text-${i}`}
-                      d={describeArc(290, 290, 235, startAngle + 2, endAngle - 2)}
-                      fill="none"
-                    />
-                  );
-                })}
-                {/* Message arcs: top and bottom */}
-                <path id="spin-msg-top" d={describeArc(290, 290, 170, 200, -20)} fill="none" />
-                <path id="spin-msg-bottom" d={describeArc(290, 290, 170, 20, 160)} fill="none" />
-              </defs>
-              {/* Wheel background with gradient */}
-              <circle cx="290" cy="290" r="290" fill="url(#wheelGradient)" />
-              {/* Segments */}
-              {segments.map((name, i) => {
-                const segAngle = 360 / segments.length;
-                const startAngle = i * segAngle;
-                const endAngle = (i + 1) * segAngle;
-                const color = getWheelColor(i, segments).color;
-                return (
-                  <path
-                    key={i}
-                    d={describeSegment(290, 290, 290, startAngle, endAngle)}
-                    fill={color}
-                  />
-                );
-              })}
-              {/* Center white circle */}
-              <circle cx="290" cy="290" r="55" fill={darkMode ? '#fff' : '#000'} />
-              {/* Curved Text */}
-              {segments.map((name, i) => {
-                const { textColor } = getWheelColor(i, segments);
-                return (
-                  <text
-                    key={i}
-                    fontFamily="'Quicksand', Arial, sans-serif"
-                    fontWeight="500"
-                    fontSize="40"
-                    fill={textColor}
-                    style={{
-                      textShadow: 'none',
-                      filter: 'none',
-                      letterSpacing: '2px'
-                    }}
-                  >
-                    <textPath
-                      href={`#arc-text-${i}`}
-                      startOffset="50%"
-                      textAnchor="middle"
-                      alignmentBaseline="middle"
-                    >
-                      {name}
-                    </textPath>
-                  </text>
-                );
-              })}
-            </svg>
-            {/* Pointer on right center */}
-            <div
-              className="absolute"
-              style={{
-                top: '50%',
-                right: '-18px',
-                transform: 'translateY(-50%)',
-                zIndex: 20,
-              }}
-            >
-              <div className="w-0 h-0 border-t-[18px] border-t-transparent border-b-[18px] border-b-transparent border-r-[36px] border-r-white"></div>
-            </div>
-          </div>
-        </section>
+       <section className="flex flex-col items-center justify-center py-8" style={{ width: '100%', height: '100%', maxWidth: '100vw', maxHeight: '100vh' }}>
+  {/* SVG Wheel */}
+  <div
+    className="relative flex items-center justify-center mx-auto"
+    style={{
+      width: `min(800px, 90vw)`, // Increased max width to 800px
+      height: `min(800px, 90vw)`, // Increased max height to 800px
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      cursor: isSpinning || segments.length < 2 ? 'not-allowed' : 'pointer',
+    }}
+    onClick={handleSpin}
+    title={segments.length < 2 ? 'Add at least 2 options to spin' : 'Click to spin the wheel'}
+  >
+    {/* Confetti */}
+    {confetti && <ConfettiEffect />}
+    <svg
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${wheelSize} ${wheelSize}`} // Uses dynamic wheelSize
+      style={{ transform: `rotate(${currentAngle}deg)` }}
+    >
+      <defs>
+        <radialGradient id="wheelGradient" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stopColor={darkMode ? '#fff' : '#000'} stopOpacity="0.15" />
+          <stop offset="100%" stopColor={darkMode ? '#000' : '#fff'} stopOpacity="0.10" />
+        </radialGradient>
+        {segments.map((name, i) => {
+          const segAngle = 360 / segments.length;
+          const startAngle = i * segAngle;
+          const endAngle = (i + 1) * segAngle;
+          return (
+            <path
+              key={i}
+              id={`arc-text-${i}`}
+              d={describeArc(wheelSize / 2, wheelSize / 2, wheelSize / 2 - 75, startAngle + 2, endAngle - 2)} // Adjusted radius
+              fill="none"
+            />
+          );
+        })}
+        {/* Message arcs: top and bottom */}
+        <path id="spin-msg-top" d={describeArc(wheelSize / 2, wheelSize / 2, wheelSize / 2 - 160, 200, -20)} fill="none" />
+        <path id="spin-msg-bottom" d={describeArc(wheelSize / 2, wheelSize / 2, wheelSize / 2 - 160, 20, 160)} fill="none" />
+      </defs>
+      {/* Wheel background with gradient */}
+      <circle cx={wheelSize / 2} cy={wheelSize / 2} r={wheelSize / 2} fill="url(#wheelGradient)" />
+      {/* Segments */}
+      {segments.map((name, i) => {
+        const segAngle = 360 / segments.length;
+        const startAngle = i * segAngle;
+        const endAngle = (i + 1) * segAngle;
+        const color = getWheelColor(i, segments).color;
+        return (
+          <path
+            key={i}
+            d={describeSegment(wheelSize / 2, wheelSize / 2, wheelSize / 2, startAngle, endAngle)}
+            fill={color}
+          />
+        );
+      })}
+      {/* Center white circle */}
+      <circle cx={wheelSize / 2} cy={wheelSize / 2} r="75" fill={darkMode ? '#fff' : '#000'} /> {/* Increased radius from 55 to 75 */}
+     {/* Radially Rotated Straight Text */}
+{segments.map((name, i) => {
+  const { textColor } = getWheelColor(i, segments);
+  const segAngle = 360 / segments.length;
+  const midAngle = (i * segAngle + segAngle / 2) * Math.PI / 180;
+  const textRadius = wheelSize * 0.31; // Distance from center
+  const x = wheelSize / 2 + textRadius * Math.cos(midAngle);
+  const y = wheelSize / 2 + textRadius * Math.sin(midAngle);
+  
+  // Calculate rotation angle to align with radial direction
+  const rotationAngle = (i * segAngle + segAngle / 2);
+  
+  return (
+    <text
+      key={i}
+      x={x}
+      y={y}
+      fill={textColor}
+      textAnchor="middle"
+      dominantBaseline="middle"
+      fontSize="35"
+      fontWeight="bold"
+      transform={`rotate(${rotationAngle}, ${x}, ${y})`}
+    >
+      {name}
+    </text>
+  );
+})}
+    </svg>
+    {/* Pointer on right center */}
+    <div
+      className="absolute"
+      style={{
+        top: '50%',
+        right: '-24px', // Increased from -18px
+        transform: 'translateY(-50%)',
+        zIndex: 20,
+      }}
+    >
+      <div className="w-0 h-0 border-t-[24px] border-t-transparent border-b-[24px] border-b-transparent border-r-[48px] border-r-white"></div> {/* Increased sizes */}
+    </div>
+  </div>
+</section>
 
         {/* Sidebar Section */}
         <aside
@@ -654,7 +655,7 @@ const wheelColors = [
         </aside>
       </main>
       {/* Spin message overlay above the wheel */}
-     {showSpinMessage && (
+    {showSpinMessage && (
   <div
     className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex flex-col items-center w-full"
     style={{
@@ -667,8 +668,11 @@ const wheelColors = [
         fontFamily: 'Quicksand, Arial, sans-serif',
         fontWeight: 700,
         fontSize: '2.5rem',
-        color: darkMode ? '#fff' : '#fff', // Changed from '#000' to '#fff' for light mode
-        textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5)',
+        color: darkMode ? '#fff' : '#000', // White in dark mode, black in light mode
+        textShadow: '2px 2px 10px rgba(0, 0, 0, 0.7), -2px -2px 10px rgba(255, 255, 255, 0.7)', // Stronger shadow for contrast
+        backgroundColor: 'rgba(255, 255, 255, 0.8)', // Semi-transparent white background
+        padding: '0.5rem 1rem',
+        borderRadius: '8px',
         marginBottom: '0.5rem',
         letterSpacing: '1px',
       }}
@@ -680,8 +684,11 @@ const wheelColors = [
         fontFamily: 'Quicksand, Arial, sans-serif',
         fontWeight: 700,
         fontSize: '1.5rem',
-        color: darkMode ? '#fff' : '#fff', // Changed from '#000' to '#fff' for light mode
-        textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5)',
+        color: darkMode ? '#fff' : '#000', // White in dark mode, black in light mode
+        textShadow: '2px 2px 10px rgba(0, 0, 0, 0.7), -2px -2px 10px rgba(255, 255, 255, 0.7)', // Stronger shadow for contrast
+        backgroundColor: 'rgba(255, 255, 255, 0.8)', // Semi-transparent white background
+        padding: '0.25rem 0.75rem',
+        borderRadius: '8px',
         letterSpacing: '1px',
       }}
     >
@@ -691,23 +698,23 @@ const wheelColors = [
 )}
       {/* Winner Modal */}
       {showWinnerModal && winner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.15)' }}>
-          <div className={`bg-${darkMode ? '#222' : '#f9f9f9'} rounded-xl shadow-2xl max-w-lg w-full mx-4 relative border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
-            <div className={`bg-${darkMode ? 'red-500' : 'red-400'} text-white text-lg font-bold rounded-t-xl px-6 py-3 flex items-center justify-between`}>
-              <span>We have a winner!</span>
-              <button className="text-2xl font-bold hover:text-gray-200" onClick={closeWinnerModal} style={{ lineHeight: 1 }}>×</button>
-            </div>
-            <div className="flex flex-col items-center justify-center px-8 py-6">
-              <div className="text-5xl font-light mb-6 text-center" style={{ fontFamily: 'Quicksand, Arial, sans-serif', fontWeight: 500, color: darkMode ? '#fff' : '#000' }}>{winner}</div>
-              <div className="flex gap-3 mt-2">
-                <button className={`px-4 py-2 rounded ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-300 text-black hover:bg-gray-400'}`} onClick={closeWinnerModal}>Close</button>
-                <button className={`px-4 py-2 rounded ${darkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-blue-400 text-black hover:bg-blue-300'}`} onClick={removeWinner}>Remove</button>
-                <button className={`px-4 py-2 rounded ${darkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-blue-400 text-black hover:bg-blue-300'}`} onClick={removeAllWinner}>Remove all instances</button>
-              </div>
-            </div>
-          </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style={{ backdropFilter: 'blur(5px)' }}>
+    <div className={`bg-${darkMode ? '#222' : '#f9f9f9'} rounded-xl shadow-2xl max-w-md w-full mx-4 p-6 relative border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+      <div className={`bg-${darkMode ? 'red-600' : 'red-500'} text-white text-lg font-bold rounded-t-xl px-6 py-3 flex items-center justify-between`}>
+        <span style={{ textShadow: '1px 1px 3px rgba(0, 0, 0, 0.7)' }}>We have a winner!</span>
+        <button className="text-2xl font-bold hover:text-gray-200" onClick={closeWinnerModal} style={{ lineHeight: 1 }}>×</button>
+      </div>
+      <div className="flex flex-col items-center justify-center px-6 py-4 bg-${darkMode ? '#333' : '#e5e7eb'} rounded-b-xl">
+        <div className="text-4xl font-light mb-4 text-center" style={{ fontFamily: 'Quicksand, Arial, sans-serif', fontWeight: 500, color: darkMode ? '#fff' : '#333', textShadow: '1px 1px 3px rgba(0, 0, 0, 0.3)' }}>{winner}</div>
+        <div className="flex gap-3">
+          <button className={`px-4 py-2 rounded ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-300 text-black hover:bg-gray-400'}`} onClick={closeWinnerModal}>Close</button>
+          <button className={`px-4 py-2 rounded ${darkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-blue-400 text-black hover:bg-blue-300'}`} onClick={removeWinner}>Remove</button>
+          <button className={`px-4 py-2 rounded ${darkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-blue-400 text-black hover:bg-blue-300'}`} onClick={removeAllWinner}>Remove all instances</button>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
