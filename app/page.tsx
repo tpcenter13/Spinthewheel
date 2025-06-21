@@ -499,7 +499,7 @@ const wheelColors = [
         );
       })}
       {/* Center white circle */}
-      <circle cx={wheelSize / 2} cy={wheelSize / 2} r="75" fill={darkMode ? '#fff' : '#000'} /> {/* Increased radius from 55 to 75 */}
+      <circle cx={wheelSize / 2} cy={wheelSize / 2} r="40" fill={darkMode ? '#fff' : '#000'} /> {/* Increased radius from 55 to 75 */}
      {/* Radially Rotated Straight Text */}
 {segments.map((name, i) => {
   const { textColor } = getWheelColor(i, segments);
@@ -520,8 +520,8 @@ const wheelColors = [
       fill={textColor}
       textAnchor="middle"
       dominantBaseline="middle"
-      fontSize="35"
-      fontWeight="bold"
+      fontSize="60"
+      fontWeight="300"
       transform={`rotate(${rotationAngle}, ${x}, ${y})`}
     >
       {name}
