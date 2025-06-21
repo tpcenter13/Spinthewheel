@@ -1,18 +1,35 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
+import '@fontsource/quicksand/500.css';
 
 export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
-  const [angle, setAngle] = useState(0);
-  const [result, setResult] = useState('');
+  const [currentAngle, setCurrentAngle] = useState(0); // in degrees
   const [isSpinning, setIsSpinning] = useState(false);
   const [segments, setSegments] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [spinSpeed, setSpinSpeed] = useState(4); // Speed in seconds (1-10)
   const [wheelSize, setWheelSize] = useState(384);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [winner, setWinner] = useState('');
-  const wheelRef = useRef<HTMLDivElement>(null);
+  const [winner, setWinner] = useState<string | null>(null);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [showSpinMessage, setShowSpinMessage] = useState(true);
+  const [isIdleSpinning, setIsIdleSpinning] = useState(true);
+  const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [confetti, setConfetti] = useState(false);
+  // For textarea entries
+  const [entriesText, setEntriesText] = useState('Ali\nBeatriz\nCharles\nDiya\nEric\nFatima\nGabriel\nHanna');
+  // Add a spin animation state
+  const [spinAnim, setSpinAnim] = useState<null | {
+    start: number;
+    duration: number;
+    from: number;
+    to: number;
+    winnerIdx: number;
+  }>(null);
+  // Tab state: 'entries' or 'results'
+  const [activeTab, setActiveTab] = useState<'entries' | 'results'>('entries');
+  // Results list
+  const [results, setResults] = useState<string[]>([]);
 
   // Handle responsive wheel sizing
   useEffect(() => {
@@ -34,6 +51,11 @@ export default function Home() {
     return () => window.removeEventListener('resize', updateWheelSize);
   }, []);
 
+  // Keep segments in sync with textarea
+  useEffect(() => {
+    setSegments(entriesText.split(/\r?\n/).filter(line => line.trim() !== ''));
+  }, [entriesText]);
+
   const addSegment = () => {
     if (inputValue.trim() && segments.length < 12) {
       setSegments([...segments, inputValue.trim()]);
@@ -43,54 +65,6 @@ export default function Home() {
 
   const removeSegment = (index: number) => {
     setSegments(segments.filter((_, i) => i !== index));
-  };
-
-  const spin = () => {
-    if (isSpinning || segments.length < 2) return;
-
-    setIsSpinning(true);
-    setResult('');
-    
-    // Reset wheel transition and position first
-    if (wheelRef.current) {
-      wheelRef.current.style.transition = 'none';
-      wheelRef.current.style.transform = 'rotate(0deg)';
-      setAngle(0);
-    }
-
-    // Small delay to ensure the reset takes effect
-    setTimeout(() => {
-      const randomDeg = Math.floor(3600 + Math.random() * 360);
-      setAngle(randomDeg);
-
-      if (wheelRef.current) {
-        wheelRef.current.style.transition = `transform ${spinSpeed}s ease-out`;
-        wheelRef.current.style.transform = `rotate(${randomDeg}deg)`;
-      }
-
-      setTimeout(() => {
-        const normalizedAngle = (360 - (randomDeg % 360)) % 360;
-        const segmentAngle = 360 / segments.length;
-        const segmentIndex = Math.floor(normalizedAngle / segmentAngle);
-        const winningSegment = segments[segmentIndex];
-        
-        setResult(winningSegment);
-        setWinner(winningSegment);
-        setIsSpinning(false);
-        
-        // Show celebration modal
-        setShowCelebration(true);
-        
-        // Auto-close modal and remove winner after 3 seconds
-        setTimeout(() => {
-          setShowCelebration(false);
-          // Remove the winning segment
-          setSegments(prevSegments => prevSegments.filter((_, i) => i !== segmentIndex));
-          setResult('');
-        }, 3000);
-        
-      }, spinSpeed * 1000);
-    }, 50);
   };
 
   const toggleDarkMode = () => {
@@ -148,6 +122,82 @@ export default function Home() {
     if (wheelSize < 350) return 8;
     return 10;
   };
+
+  // Color and textColor logic for dynamic segments
+  const wheelColors = [
+    { color: '#4285F4', textColor: '#fff' }, // Blue
+    { color: '#EA4335', textColor: '#fff' }, // Red
+    { color: '#FBBC05', textColor: '#111' }, // Yellow
+    { color: '#34A853', textColor: '#111' }  // Green
+  ];
+
+  // Helper to get color for a segment index, avoiding consecutive duplicates
+  function getWheelColor(idx: number, segments: string[]): { color: string; textColor: string; colorIdx: number } {
+    let colorIdx = idx % wheelColors.length;
+    // Avoid consecutive duplicates by checking all previous assignments
+    if (idx > 0) {
+      let prevColorIdx = -1;
+      for (let i = 0; i < idx; i++) {
+        prevColorIdx = getWheelColorSimple(i);
+        if (i === idx - 1 && colorIdx === prevColorIdx) {
+          colorIdx = (colorIdx + 1) % wheelColors.length;
+        }
+      }
+    }
+    return { ...wheelColors[colorIdx], colorIdx };
+  }
+
+  function getWheelColorSimple(idx: number): number {
+    return idx % wheelColors.length;
+  }
+
+  // Helper for SVG arc path
+  function describeArc(
+    cx: number,
+    cy: number,
+    r: number,
+    startAngle: number,
+    endAngle: number
+  ): string {
+    const start = {
+      x: cx + r * Math.cos((Math.PI / 180) * startAngle),
+      y: cy + r * Math.sin((Math.PI / 180) * startAngle)
+    };
+    const end = {
+      x: cx + r * Math.cos((Math.PI / 180) * endAngle),
+      y: cy + r * Math.sin((Math.PI / 180) * endAngle)
+    };
+    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
+    return [
+      `M ${start.x} ${start.y}`,
+      `A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`
+    ].join(' ');
+  }
+
+  // Helper for segment path (pie slice)
+  function describeSegment(
+    cx: number,
+    cy: number,
+    r: number,
+    startAngle: number,
+    endAngle: number
+  ): string {
+    const start = {
+      x: cx + r * Math.cos((Math.PI / 180) * startAngle),
+      y: cy + r * Math.sin((Math.PI / 180) * startAngle)
+    };
+    const end = {
+      x: cx + r * Math.cos((Math.PI / 180) * endAngle),
+      y: cy + r * Math.sin((Math.PI / 180) * endAngle)
+    };
+    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
+    return [
+      `M ${cx} ${cy}`,
+      `L ${start.x} ${start.y}`,
+      `A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`,
+      'Z'
+    ].join(' ');
+  }
 
   // Fireworks component
   const Fireworks = () => {
@@ -225,329 +275,458 @@ export default function Home() {
     return <div ref={fireworksRef} className="absolute inset-0 pointer-events-none z-30" />;
   };
 
-  // Celebration Modal
-  const CelebrationModal = () => {
-    if (!showCelebration) return null;
+  useEffect(() => {
+    // Optionally, hide the message after first spin in the future
+    setShowSpinMessage(true);
+    setIsIdleSpinning(true);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        handleSpin();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-    return (
-      <div className="fixed inset-0 bg-white bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-40 px-4">
-        <div className={`relative rounded-2xl p-8 max-w-md w-full text-center ${
-          darkMode ? 'bg-gray-800 text-white' : 'bg-white text-black'
-        } shadow-2xl animate-bounce`}>
-          <Fireworks />
-          
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-2xl font-bold mb-4">Congratulations!</h2>
-          <div className={`text-3xl font-bold mb-6 p-4 rounded-lg ${
-            darkMode ? 'bg-yellow-800 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
-          }`}>
-            {winner}
-          </div>
-          <p className="text-lg mb-4">🎊 Winner! 🎊</p>
-          <div className="text-sm opacity-75">
-            This option will be removed in a moment...
-          </div>
-          
-          <div className="absolute -top-2 -right-2 text-4xl animate-spin">⭐</div>
-          <div className="absolute -top-3 -left-2 text-3xl animate-bounce">🎈</div>
-          <div className="absolute -bottom-2 -right-3 text-3xl animate-pulse">🎁</div>
-        </div>
-      </div>
-    );
+  // Calculate the angle for each segment
+  const segmentAngle = segments.length > 0 ? 360 / segments.length : 0;
+
+  // ABSOLUTE: Only this function can trigger a spin.
+  function handleSpin() {
+    if (isSpinning || segments.length < 2) return;
+    setIsIdleSpinning(false);
+    setIsSpinning(true);
+    setShowSpinMessage(false);
+    setWinner(null);
+    setShowWinnerModal(false);
+    setConfetti(false);
+    // Calculate the spin
+    const randomIdx = Math.floor(Math.random() * segments.length);
+    const randomOffset = Math.random() * segmentAngle;
+    const from = currentAngle;
+    const to = from + 360 * 5 + (360 - (randomIdx * segmentAngle + randomOffset));
+    setSpinAnim({
+      start: performance.now(),
+      duration: 4000,
+      from,
+      to,
+      winnerIdx: randomIdx
+    });
+  }
+
+  // Spin animation effect
+  useEffect(() => {
+    if (!spinAnim) return;
+    let stopped = false;
+    function animate(now: number) {
+      if (stopped) return;
+      // Destructure spinAnim inside the animation frame to avoid linter errors
+      const anim = spinAnim;
+      if (!anim) return;
+      const { start, duration, from, to, winnerIdx } = anim;
+      const elapsed = Math.min(now - start, duration);
+      // Ease-out cubic
+      const t = elapsed / duration;
+      const eased = 1 - Math.pow(1 - t, 3);
+      const angle = from + (to - from) * eased;
+      setCurrentAngle(angle);
+      if (elapsed < duration) {
+        requestAnimationFrame(animate);
+      } else {
+        setIsSpinning(false);
+        setWinner(segments[winnerIdx]);
+        setShowWinnerModal(true);
+        setConfetti(true);
+        setCurrentAngle(((to % 360) + 360) % 360);
+        setSpinAnim(null);
+      }
+    }
+    requestAnimationFrame(animate);
+    return () => { stopped = true; };
+  }, [spinAnim, segments]);
+
+  // Remove winner (first instance)
+  function removeWinner() {
+    if (!winner) return;
+    const lines = entriesText.split(/\r?\n/);
+    const idx = lines.findIndex(line => line.trim() === winner);
+    if (idx !== -1) {
+      lines.splice(idx, 1);
+      setEntriesText(lines.join('\n'));
+    }
+    setShowWinnerModal(false);
+    setConfetti(false);
+  }
+  // Remove all winner instances
+  function removeAllWinner() {
+    if (!winner) return;
+    const lines = entriesText.split(/\r?\n/).filter(line => line.trim() !== winner);
+    setEntriesText(lines.join('\n'));
+    setShowWinnerModal(false);
+    setConfetti(false);
+  }
+  // Close modal
+  function closeWinnerModal() {
+    setShowWinnerModal(false);
+    setConfetti(false);
+  }
+
+  useEffect(() => {
+    if (isIdleSpinning && !isSpinning) {
+      let raf: number;
+      let last = performance.now();
+      const spinIdle = (now: number) => {
+        const delta = now - last;
+        last = now;
+        setCurrentAngle(a => (a + (delta * 360) / 10000) % 360); // 36deg/sec
+        raf = requestAnimationFrame(spinIdle);
+      };
+      raf = requestAnimationFrame(spinIdle);
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isIdleSpinning, isSpinning]);
+
+  // When a winner is chosen, add to results
+  useEffect(() => {
+    if (winner) {
+      setResults(prev => [...prev, winner]);
+    }
+  }, [winner]);
+
+  // Sort results
+  const sortResults = () => {
+    setResults(prev => [...prev].sort((a, b) => a.localeCompare(b)));
+  };
+  // Clear results
+  const clearResults = () => {
+    setResults([]);
   };
 
   return (
-    <main className={`min-h-screen flex flex-col items-center justify-center transition-colors duration-300 px-2 py-4 ${darkMode ? 'bg-black text-white' : 'bg-white text-black'}`}>
-      <button
-        onClick={toggleDarkMode}
-        className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 text-xs sm:text-sm border rounded hover:bg-gray-200 dark:hover:bg-gray-800 transition"
-      >
-        <span className="hidden sm:inline">Toggle Dark Mode</span>
-        <span className="sm:hidden">🌓</span>
-      </button>
-
-      <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4 lg:gap-8 w-full max-w-6xl">
+    <div className="min-h-screen w-full bg-[#181818] flex flex-col">
+      {/* Blue Navbar */}
+      <nav className="w-full bg-[#4285F4] flex items-center px-4 py-2 gap-4 shadow-md">
+        {/* Logo */}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white">
+            {/* Placeholder logo SVG */}
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="14" fill="#FBBC05"/><circle cx="14" cy="14" r="9" fill="#EA4335"/><circle cx="14" cy="14" r="5" fill="#34A853"/></svg>
+          </div>
+          <span className="text-white text-lg font-bold ml-2">wheelofnames.com</span>
+        </div>
+        {/* Spacer */}
+        <div className="flex-1" />
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 text-white text-sm font-medium">
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="palette">🎨</span>Customize</button>
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="new">📄</span>New</button>
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="open">📂</span>Open</button>
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="save">💾</span>Save</button>
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="share">🔗</span>Share</button>
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="gallery">🖼️</span>Gallery</button>
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="more">⋯</span>More</button>
+          <button className="flex items-center gap-1 px-2 py-1 hover:bg-blue-600 rounded transition"><span role="img" aria-label="language">🌐</span>English</button>
+        </div>
+      </nav>
+      {/* Main Content */}
+      <main className="flex-1 flex items-center justify-center w-full max-w-full relative overflow-hidden">
         {/* Wheel Section */}
-        <div className="flex flex-col items-center w-full lg:w-auto">
-          <div className="relative" style={{ width: wheelSize, height: wheelSize }}>
-            {/* Pointer */}
-            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 z-20">
-              <div 
-                className="w-0 h-0 border-l-transparent border-r-transparent border-b-red-500"
-                style={{
-                  borderLeftWidth: wheelSize * 0.01,
-                  borderRightWidth: wheelSize * 0.01,
-                  borderBottomWidth: wheelSize * 0.02
-                }}
-              ></div>
-            </div>
-            
-            {/* Spinning Wheel */}
-            <div
-              ref={wheelRef}
-              className="w-full h-full absolute"
-              style={{
-                transform: `rotate(${angle}deg)`,
-                transformOrigin: 'center center',
-              }}
+        <section className="flex flex-col items-center justify-center py-8" style={{width: '100%', height: '100%', maxWidth: '100vw', maxHeight: '100vh'}}>
+          {/* SVG Wheel */}
+          <div
+            className="relative flex items-center justify-center mx-auto"
+            style={{ width: 'min(580px, 90vw)', height: 'min(580px, 90vw)', maxWidth: '90vw', maxHeight: '90vh', cursor: isSpinning || segments.length < 2 ? 'not-allowed' : 'pointer' }}
+            onClick={handleSpin}
+            title={segments.length < 2 ? 'Add at least 2 options to spin' : 'Click to spin the wheel'}
+          >
+            {/* Confetti */}
+            {confetti && <ConfettiEffect />}
+            <svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 580 580"
+              style={{ transform: `rotate(${currentAngle}deg)` }}
             >
-              <svg
-                width={wheelSize}
-                height={wheelSize}
-                viewBox={`0 0 ${wheelSize} ${wheelSize}`}
-                className="w-full h-full"
-              >
-                {segments.map((segment, index) => {
-                  const textPos = getTextPosition(index, segments.length);
-                  const textLimit = getTextLimit();
+              <defs>
+                <radialGradient id="wheelGradient" cx="50%" cy="50%" r="60%">
+                  <stop offset="0%" stopColor="#fff" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="#000" stopOpacity="0.10" />
+                </radialGradient>
+                {segments.map((name, i) => {
+                  const segAngle = 360 / segments.length;
+                  const startAngle = i * segAngle;
+                  const endAngle = (i + 1) * segAngle;
                   return (
-                    <g key={index}>
                       <path
-                        d={createSlicePath(index, segments.length)}
-                        fill={index % 2 === 0
-                          ? (darkMode ? '#374151' : '#e5e7eb')
-                          : (darkMode ? '#4b5563' : '#f3f4f6')
-                        }
-                        stroke={darkMode ? '#1f2937' : '#9ca3af'}
-                        strokeWidth="1"
-                      />
-                      <text
-                        x={textPos.x}
-                        y={textPos.y}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fontSize={getWheelFontSize()}
-                        fontWeight="600"
-                        fill={darkMode ? '#ffffff' : '#000000'}
-                        transform={`rotate(${textPos.rotation > 90 && textPos.rotation < 270 ? textPos.rotation + 180 : textPos.rotation}, ${textPos.x}, ${textPos.y})`}
-                      >
-                        <tspan x={textPos.x} dy="0">
-                          {segment.length > textLimit ? segment.substring(0, textLimit) + '...' : segment}
-                        </tspan>
-                      </text>
-                    </g>
+                      key={i}
+                      id={`arc-text-${i}`}
+                      d={describeArc(290, 290, 235, startAngle + 2, endAngle - 2)}
+                      fill="none"
+                    />
                   );
                 })}
-              </svg>
-            </div>
-
-            {/* Center Spin Button */}
-            <button
-              onClick={spin}
-              disabled={isSpinning || segments.length < 2}
-              className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 rounded-full transition-all duration-200 flex items-center justify-center font-bold text-white shadow-lg ${
-                isSpinning || segments.length < 2
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-500 hover:bg-blue-600 hover:scale-110 active:scale-95'
-              }`}
+                {/* Message arcs: top and bottom */}
+                <path id="spin-msg-top" d={describeArc(290, 290, 170, 200, -20)} fill="none" />
+                <path id="spin-msg-bottom" d={describeArc(290, 290, 170, 20, 160)} fill="none" />
+              </defs>
+              {/* Wheel background with gradient */}
+              <circle cx="290" cy="290" r="290" fill="url(#wheelGradient)" />
+              {/* Segments */}
+              {segments.map((name, i) => {
+                const segAngle = 360 / segments.length;
+                const startAngle = i * segAngle;
+                const endAngle = (i + 1) * segAngle;
+                const color = getWheelColor(i, segments).color;
+                return (
+                  <path
+                    key={i}
+                    d={describeSegment(290, 290, 290, startAngle, endAngle)}
+                    fill={color}
+                  />
+                );
+              })}
+              {/* Center white circle */}
+              <circle cx="290" cy="290" r="55" fill="#fff" />
+              {/* Curved Text */}
+              {segments.map((name, i) => {
+                const { textColor } = getWheelColor(i, segments);
+                return (
+                  <text
+                    key={i}
+                    fontFamily="'Quicksand', Arial, sans-serif"
+                    fontWeight="500"
+                    fontSize="40"
+                    fill={textColor}
               style={{
-                width: wheelSize * 0.104,
-                height: wheelSize * 0.104,
-                fontSize: wheelSize * 0.025
-              }}
-              title={segments.length < 2 ? 'Add at least 2 options to spin' : 'Click to spin the wheel'}
-            >
-              {isSpinning ? (
-                <div className="animate-spin">⟳</div>
-              ) : (
-                'SPIN'
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Controls Section */}
-        <div className="w-full max-w-sm lg:max-w-xs">
-          <h3 className="text-lg font-semibold mb-4 text-center lg:text-left">Wheel Options</h3>
-          
-          {/* Input Section */}
-          <div className="space-y-2 mb-4">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Enter new option"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addSegment();
-                }
-              }}
-              className={`w-full p-3 text-sm border rounded-lg ${
-                darkMode
-                  ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
-                  : 'bg-white border-gray-300 text-black placeholder-gray-500'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            />
-            <button
-              onClick={addSegment}
-              disabled={!inputValue.trim() || segments.length >= 12}
-              className={`w-full px-4 py-3 text-sm rounded-lg transition font-medium ${
-                !inputValue.trim() || segments.length >= 12
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-green-500 hover:bg-green-600'
-              } text-white`}
-            >
-              Add Option ({segments.length}/12)
-            </button>
-          </div>
-
-          {/* Speed Control */}
-          <div className={`p-3 sm:p-4 border rounded-lg mb-4 ${
-            darkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-50'
-          }`}>
-            <label className="block text-sm font-medium mb-2">
-              Spin Speed: {getSpeedLabel(spinSpeed)} ({spinSpeed}s)
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="10"
-              step="0.5"
-              value={spinSpeed}
-              onChange={(e) => setSpinSpeed(parseFloat(e.target.value))}
-              disabled={isSpinning}
-              className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
-                darkMode
-                  ? 'bg-gray-700'
-                  : 'bg-gray-200'
-              } ${isSpinning ? 'opacity-50 cursor-not-allowed' : ''}`}
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Fast</span>
-              <span>Slow</span>
+                      textShadow: 'none',
+                      filter: 'none',
+                      letterSpacing: '2px'
+                    }}
+                  >
+                    <textPath
+                      href={`#arc-text-${i}`}
+                      startOffset="50%"
+                      textAnchor="middle"
+                      alignmentBaseline="middle"
+                    >
+                      {name}
+                    </textPath>
+                  </text>
+                );
+              })}
+            </svg>
+            {/* Pointer on right center */}
+            <div className="absolute" style={{ top: '50%', right: '-18px', transform: 'translateY(-50%)', zIndex: 20 }}>
+              <div className="w-0 h-0 border-t-[18px] border-t-transparent border-b-[18px] border-b-transparent border-r-[36px] border-r-white"></div>
             </div>
           </div>
+        </section>
 
-          {/* Segments List */}
-          <div className={`border rounded-lg p-2 mb-4 ${
-            darkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-50'
-          }`}>
-            <h4 className="text-sm font-medium mb-2 px-2">Current Options:</h4>
-            <div className="space-y-1 max-h-32 sm:max-h-48 overflow-y-auto">
-              {segments.length === 0 ? (
-                <p className="text-xs text-gray-500 px-2 py-1">No options added yet</p>
-              ) : (
-                segments.map((segment, index) => (
-                  <div
-                    key={index}
-                    className={`flex justify-between items-center p-2 rounded border text-sm ${
-                      darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
-                    }`}
-                  >
-                    <span className="truncate flex-1 mr-2">{segment}</span>
-                    <button
-                      onClick={() => removeSegment(index)}
-                      className="px-2 py-1 text-xs rounded bg-red-500 hover:bg-red-600 text-white transition flex-shrink-0"
-                    >
-                      ×
+        {/* Sidebar Section */}
+        <aside className="w-[340px] min-h-[540px] bg-[#181818] border border-[#23272b] rounded-2xl shadow-lg flex flex-col px-4 pt-4 pb-2 absolute right-8 top-1/2" style={{transform: 'translateY(-50%)'}}>
+          {sidebarHidden ? (
+            <div className="flex justify-end items-center h-10">
+              <label className="flex items-center gap-1 text-xs text-gray-400 font-bold pb-1 px-2 cursor-pointer select-none" style={{height: '32px'}}>
+            <input
+                  type="checkbox"
+                  className="align-middle"
+                  checked={sidebarHidden}
+                  onChange={e => setSidebarHidden(e.target.checked)}
+                  style={{ accentColor: '#23272b' }}
+                />
+                Hide
+            </label>
+            </div>
+          ) : (
+            <>
+              {/* Tabs */}
+              <div className="flex items-center mb-3 gap-2">
+                <button
+                  className={`text-white font-bold text-base pb-1 px-1 focus:outline-none border-b-2 ${activeTab === 'entries' ? 'border-blue-500' : 'border-transparent'}`}
+                  onClick={() => setActiveTab('entries')}
+                >
+                  Entries <span className="ml-1 bg-[#23272b] rounded px-2 text-xs font-normal">{segments.length}</span>
+                </button>
+                <button
+                  className={`text-gray-400 font-bold text-base pb-1 px-1 ml-4 focus:outline-none border-b-2 ${activeTab === 'results' ? 'border-blue-500 text-white' : 'border-transparent'}`}
+                  onClick={() => setActiveTab('results')}
+                >
+                  Results <span className="ml-1 bg-[#23272b] rounded px-2 text-xs font-normal">{results.length}</span>
+                </button>
+                <label className="flex items-center gap-1 text-xs text-gray-400 font-bold pb-1 px-2 cursor-pointer select-none ml-4" style={{height: '32px'}}>
+                  <input
+                    type="checkbox"
+                    className="align-middle"
+                    checked={sidebarHidden}
+                    onChange={e => setSidebarHidden(e.target.checked)}
+                    style={{ accentColor: '#23272b' }}
+                  />
+                  Hide
+                </label>
+              </div>
+              {/* Tab content */}
+              {activeTab === 'entries' ? (
+                <>
+                  {/* Controls */}
+                  <div className="flex gap-2 mb-2">
+                    <button className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 12h16M4 6h16M4 18h16"/></svg>
+                      Shuffle
+                    </button>
+                    <button className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18"/></svg>
+                      Sort
+                    </button>
+                    <button className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5"/></svg>
+                      Add image
                     </button>
                   </div>
-                ))
+                  <div className="mb-2">
+                    <label className="text-xs text-gray-400 select-none cursor-pointer"><input type="checkbox" className="mr-1 align-middle"/>Advanced</label>
+                  </div>
+                  {/* Entry List as textarea */}
+                  <div className="flex-1 bg-black rounded-lg p-2 text-white text-sm mb-2" style={{minHeight: '220px'}}>
+                    <textarea
+                      value={entriesText}
+                      onChange={e => setEntriesText(e.target.value)}
+                      className="w-full h-full bg-black text-white text-sm resize-none outline-none border-none p-0 m-0"
+                      style={{minHeight: '200px', maxHeight: '340px'}}
+                      spellCheck={false}
+                    />
+                  </div>
+                  {/* Version and Changelog */}
+                  <div className="flex items-center justify-between text-xs text-gray-400 mt-2">
+                    <span>Version 360 <span className="bg-blue-700 text-white rounded px-1 ml-1">New!</span></span>
+                    <a href="#" className="text-blue-400 hover:underline">Changelog</a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Results Controls */}
+                  <div className="flex gap-2 mb-2">
+                    <button onClick={sortResults} className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18"/></svg>
+                      Sort
+                    </button>
+                    <button onClick={clearResults} className="flex items-center gap-1 bg-[#23272b] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#222] transition">
+                      Clear the list
+                    </button>
+                  </div>
+                  {/* Results textarea-like box */}
+                  <div className="flex-1 bg-black rounded-lg p-2 text-white text-sm mb-2" style={{minHeight: '220px'}}>
+                    <textarea
+                      value={results.join('\n')}
+                      readOnly
+                      className="w-full h-full bg-black text-white text-sm resize-none outline-none border-none p-0 m-0"
+                      style={{minHeight: '200px', maxHeight: '340px'}}
+                      spellCheck={false}
+                    />
+                  </div>
+                </>
               )}
-            </div>
+            </>
+          )}
+        </aside>
+      </main>
+      {/* Spin message overlay above the wheel */}
+      {showSpinMessage && (
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex flex-col items-center w-full"
+          style={{ transform: 'translate(-50%, -50%)', userSelect: 'none' }}
+        >
+          <div
+            style={{
+              fontFamily: 'Quicksand, Arial, sans-serif',
+              fontWeight: 700,
+              fontSize: '2.5rem',
+              color: '#fff',
+              textShadow: '2px 2px 8px #000',
+              filter: 'drop-shadow(0 2px 2px #0008)',
+              marginBottom: '0.5rem',
+              letterSpacing: '1px',
+            }}
+          >
+            Click to spin
           </div>
-
-          {/* Result Display */}
-          <div className={`border-2 rounded-lg p-4 flex flex-col items-center justify-center ${
-            darkMode ? 'border-gray-600 bg-gray-900' : 'border-gray-300 bg-gray-50'
-          }`}>
-            <h4 className="text-sm font-semibold mb-3">Last Result</h4>
-            <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 flex items-center justify-center text-xs sm:text-sm font-medium p-2 text-center ${
-              result
-                ? (darkMode ? 'border-green-400 bg-green-900 text-green-100' : 'border-green-500 bg-green-100 text-green-800')
-                : (darkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-white')
-            }`}>
-              <span className="break-words">
-                {result || '?'}
-              </span>
+          <div
+            style={{
+              fontFamily: 'Quicksand, Arial, sans-serif',
+              fontWeight: 700,
+              fontSize: '1.5rem',
+              color: '#fff',
+              textShadow: '2px 2px 8px #000',
+              filter: 'drop-shadow(0 2px 2px #0008)',
+              letterSpacing: '1px',
+            }}
+          >
+            or press ctrl+enter
+          </div>
+        </div>
+      )}
+      {/* Winner Modal */}
+      {showWinnerModal && winner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'rgba(0,0,0,0.15)'}}>
+          <div className="bg-[#222] rounded-xl shadow-2xl max-w-lg w-full mx-4 relative border border-gray-700">
+            <div className="bg-red-600 text-white text-lg font-bold rounded-t-xl px-6 py-3 flex items-center justify-between">
+              <span>We have a winner!</span>
+              <button className="text-2xl font-bold hover:text-gray-200" onClick={closeWinnerModal} style={{lineHeight:1}}>&times;</button>
+            </div>
+            <div className="flex flex-col items-center justify-center px-6 py-8">
+              <div className="text-5xl font-light mb-6" style={{fontFamily:'Quicksand, Arial, sans-serif'}}>{winner}</div>
+              <div className="flex gap-3 mt-2">
+                <button className="px-4 py-2 rounded bg-gray-700 text-white font-semibold hover:bg-gray-600" onClick={closeWinnerModal}>Close</button>
+                <button className="px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-500" onClick={removeWinner}>Remove</button>
+                <button className="px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-500" onClick={removeAllWinner}>Remove all instances</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+    </div>
+  );
+}
 
-      {/* Celebration Modal */}
-      <CelebrationModal />
-
-      <style jsx>{`
-        input[type="range"]::-webkit-slider-thumb {
-          appearance: none;
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 2px solid #ffffff;
-          box-shadow: 0 0 2px rgba(0,0,0,0.6);
-        }
-        
-        input[type="range"]::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 2px solid #ffffff;
-          box-shadow: 0 0 2px rgba(0,0,0,0.6);
-        }
-
-        input[type="range"]:focus {
-          outline: none;
-        }
-
-        input[type="range"]:focus::-webkit-slider-thumb {
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-        }
-
-        .firework-particle {
-          transition: all 1s ease-out;
-        }
-
-        @keyframes bounce {
-          0%, 20%, 53%, 80%, 100% {
-            transform: translate3d(0,0,0);
-          }
-          40%, 43% {
-            transform: translate3d(0,-30px,0);
-          }
-          70% {
-            transform: translate3d(0,-15px,0);
-          }
-          90% {
-            transform: translate3d(0,-4px,0);
-          }
-        }
-
-        .animate-bounce {
-          animation: bounce 1s infinite;
-        }
-
-        @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: .5;
-          }
-        }
-
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+// Confetti effect component
+function ConfettiEffect() {
+  // Simple confetti using absolutely positioned divs
+  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#FBBC05', '#EA4335', '#4285F4', '#34A853'];
+  const confettiPieces = Array.from({length: 80});
+  return (
+    <div className="pointer-events-none fixed inset-0 z-40">
+      {confettiPieces.map((_, i) => {
+        const left = Math.random() * 100;
+        const top = Math.random() * 100;
+        const size = 6 + Math.random() * 8;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const duration = 2.5 + Math.random() * 1.5;
+        const delay = Math.random() * 1.5;
+        const rotate = Math.random() * 360;
+        return (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${left}%`,
+              top: `${top}%`,
+              width: size,
+              height: size * 0.4,
+              background: color,
+              borderRadius: '2px',
+              opacity: 0.85,
+              transform: `rotate(${rotate}deg)`,
+              animation: `confetti-fall ${duration}s ${delay}s linear forwards`,
+            }}
+          />
+        );
+      })}
+      <style>{`
+        @keyframes confetti-fall {
+          0% { opacity: 0.85; transform: translateY(-10vh) scale(1) rotate(0deg); }
+          80% { opacity: 0.85; }
+          100% { opacity: 0; transform: translateY(100vh) scale(0.8) rotate(360deg); }
         }
       `}</style>
-    </main>
+    </div>
   );
 }
