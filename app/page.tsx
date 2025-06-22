@@ -68,8 +68,10 @@ useEffect(() => {
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle('dark', !darkMode);
+    setDarkMode(prev => {
+      document.documentElement.classList.toggle('dark', !prev);
+      return !prev;
+    });
   };
 
   const createSlicePath = (index: number, totalSegments: number) => {
@@ -280,6 +282,10 @@ const wheelColors = [
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         handleSpin();
+      }
+      // Toggle dark mode with '1' key (no modifiers)
+      if (e.key === '1' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        toggleDarkMode();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
